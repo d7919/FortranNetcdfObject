@@ -90,10 +90,19 @@ program tester
      call My_Output%increment_unlim !This advances the unlimited dimension
      if(mod(i,10).eq.0) call My_Output%flush_file() !Flush the output
   enddo
-  call My_Output%set_unlim(1) !This sets the unlimited dimension value
-  call My_Output%write_var('phit',-1.001)
 
   !Finish up
+  call My_Output%close_file
+  call My_Output%free
+
+  !Now open the file up again, read it in and save it as a different file (without data)
+  call My_Output%open_file(rw=.false.)
+  call My_Output%populate_from_file
+  call My_Output%close_file
+  call My_Output%set_name("copy.nc")
+  call My_Output%create_and_define
+  call My_Output%enddef
+  call My_Output%write_var('y',yy)
   call My_Output%close_file
   call My_Output%free
 end program tester

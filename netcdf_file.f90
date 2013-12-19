@@ -39,7 +39,7 @@ module netcdf_file
      !Meta data
      integer :: unlim_dim=1
      integer :: ndim, nvar
-     logical :: def_mode, opened
+     logical :: def_mode, opened=.false., writable=.false.
    contains
      private
      procedure,public :: init !Basic initialisation
@@ -59,28 +59,32 @@ module netcdf_file
      procedure :: has_dim !Check if we have a named dim
      procedure :: has_var !Check if we have a named var
      procedure :: get_dim_id !Get the dimension id corresponding to a named dim
+     procedure :: get_dim_name !Get the dimension name corresponding to a dim id
      procedure :: get_dim_index !Get the index corresponding to a named dimension
      procedure :: get_var_index !Get the index corresponding to a named variable
      procedure :: enable_complex !Creates the complex dimension
      procedure,public :: flush_file !Flush the output
      procedure,public :: increment_unlim !Increments the size of the unlimited dimension 
      procedure,public :: set_unlim !Sets the current index of the unlimited dimension 
+     procedure :: create_file !Creates and opens the file
+     procedure,public :: open_file !Opens an existing file in read-only or read-write mode
+     procedure,public :: populate_from_file !Populates dimensions and variables from open file
   end type ncdf_file_type
 
 contains
   !>Initialise the netcdf file object
-  subroutine init(self,ndim,nvar)
+  subroutine init(self,ndim,nvar,name)
     implicit none
     class(ncdf_file_type), intent(inout) :: self
     integer, intent(in), optional :: ndim,nvar
-
+    character(len=*),intent(in),optional:: name
     !If we've passed a dim/var number then preallocate
     !else we need either a linked list or temporaries.
     if(present(ndim)) allocate(self%dims(ndim))
     if(present(nvar)) allocate(self%vars(nvar))
+    if(present(name)) call self%set_name(name)
 
     !Initialise variables
-    call self%set_name("input.out.nc")
     self%ndim=0
     self%nvar=0
   end subroutine init
@@ -111,10 +115,7 @@ contains
     class(ncdf_file_type), intent(inout) :: self
     integer :: status, i
     !Open the file
-    status=nf90_create(trim(self%name),NF90_CLOBBER,self%id)
-
-    !Set the def mod
-    self%def_mode=.true.
+    call self%create_file
 
     !Now define the dimensions
     do i=1,self%ndim
@@ -126,14 +127,59 @@ contains
        status=self%define_var(self%vars(i))
     enddo
   end subroutine create_and_define
+
+  !Create and open the file (overwrites existing file)
+  subroutine create_file(self)
+    use netcdf, only: nf90_create,NF90_CLOBBER
+    implicit none
+    class(ncdf_file_type), intent(inout) :: self
+    integer :: status
+    if(self%opened)return
+
+    !Open the file
+    status=nf90_create(trim(self%name),NF90_CLOBBER,self%id)
+
+    !Set the def mod
+    self%def_mode=.true.    
+
+    !Set opened state
+    self%opened=.true.
+    self%writable=.true.
+  end subroutine create_file
   
+  !Open the file (Read-only/Read-write)
+  subroutine open_file(self,rw)
+    use netcdf, only: nf90_open,NF90_NOWRITE,NF90_WRITE
+    implicit none
+    class(ncdf_file_type), intent(inout) :: self
+    logical, intent(in),optional :: rw
+    logical :: do_rw
+    integer :: status
+    if(self%opened)return
+    do_rw=.false.
+    if(present(rw))then
+       if(rw) do_rw=.true.
+    endif
+    if(rw)then
+       status=nf90_open(self%name,NF90_WRITE,self%id)
+       self%writable=.true.
+    else
+       status=nf90_open(self%name,NF90_NOWRITE,self%id)
+       self%writable=.false.
+    endif
+    self%def_mode=.false.
+    self%opened=.true.
+  end subroutine open_file
+
   !Close the file
   subroutine close_file(self)
     use netcdf, only: nf90_close
     implicit none
     class(ncdf_file_type), intent(inout) :: self
     integer :: status
+    if(.not.self%opened)return
     status=nf90_close(self%id)
+    self%opened=.false.
   end subroutine close_file
 
   !Set the filename
@@ -193,6 +239,80 @@ contains
     status=nf90_sync(self%id)
   end subroutine flush_file
 
+  !Populate from open file
+  subroutine populate_from_file(self)
+    use netcdf, only: nf90_inquire, nf90_inquire_dimension, nf90_inquire_variable
+    use netcdf_dim, only: dim_max_name_len, dim_complex_name
+    use netcdf_var, only: var_max_name_len
+    implicit none
+    class(ncdf_file_type), intent(inout) :: self
+    integer :: status, ndim_f,nvar_f,natt_f, unlim_id,form, idim, ivar
+    integer :: dlen, vtype,vndim,vnatts
+    logical :: complx
+    integer, dimension(:), allocatable :: vdim_ids
+    character(len=dim_max_name_len),dimension(:),allocatable :: vdim_names,dim_names
+    character(len=dim_max_name_len) :: dname
+    character(len=var_max_name_len) :: vname
+    !Make sure file is opened
+    if(.not.self%opened)then
+       call self%open_file
+    endif
+
+    !Make sure we're free
+    call self%free
+
+    !Now find out about the file
+    status=nf90_inquire(self%id,ndimensions=ndim_f,nvariables=nvar_f,&
+         nattributes=natt_f,unlimiteddimid=unlim_id,formatnum=form)
+    
+    !Init the object
+    call self%init(ndim=ndim_f,nvar=nvar_f)
+
+    allocate(dim_names(ndim_f))
+
+    !Now we want to create all the dimensions
+    do idim=1,ndim_f
+       !Get dimension name and length
+       status=nf90_inquire_dimension(self%id,idim,dname,dlen)
+       dim_names(idim)=trim(dname)
+
+       !Now make dimension
+       if(idim.eq.unlim_id)then
+          call self%create_dim(dname,unlimited=.true.)
+          self%unlim_dim=dlen
+       else
+          call self%create_dim(dname,dlen)
+       endif
+    enddo
+
+    !Now we want to create all the variables
+    do ivar=1,nvar_f
+       !Get var name, type, ndims, natts
+       status=nf90_inquire_variable(self%id,ivar,name=vname,xtype=vtype,&
+            ndims=vndim,natts=vnatts)
+
+       !Create variable
+       if(vndim.gt.0)then
+          !Get dimension ids and names
+          allocate(vdim_ids(vndim),vdim_names(vndim))
+          status=nf90_inquire_variable(self%id,ivar,dimids=vdim_ids)
+          complx=.false.
+
+          !Now convert to names
+          do idim=1,vndim
+             vdim_names(idim)=trim(dim_names(vdim_ids(idim)))
+             if(trim(vdim_names(idim)).eq.trim(dim_complex_name)) complx=.true.
+          enddo
+          
+          call self%create_var(vname,dims=vdim_names,type_int=vtype,complx=complx)
+          deallocate(vdim_ids,vdim_names)
+       else
+          call self%create_var(vname,type_int=vtype)
+       endif
+    enddo
+
+    deallocate(dim_names)
+  end subroutine populate_from_file
   !/////////////////////
   !// DIMENSION RELATED 
   !/////////////////////
@@ -281,6 +401,28 @@ contains
        stop
     endif
   end function get_dim_id
+
+  !Find the dimension name corresponding to dimension id
+  function get_dim_name(self,id)
+    use netcdf_dim, only: dim_max_name_len
+    implicit none
+    class(ncdf_file_type), intent(in) :: self
+    integer,intent(in) :: id
+    integer :: i
+    character(len=dim_max_name_len) :: get_dim_name
+    get_dim_name=''
+    do i=1,self%ndim
+       print*,self%dims(i)%name
+       if(self%dims(i)%id.eq.id) then
+          get_dim_name=self%dims(i)%name
+          exit
+       endif
+    enddo
+    if(get_dim_name.eq.'') then
+       print*,"ERROR: No name found for dimension id '",id,"' -- Probably not added yet --> Have to halt."
+       stop
+    endif
+  end function get_dim_name
 
   !Make a dimension and attach it to the file object
   subroutine create_dim(self,name,size,unlimited)
