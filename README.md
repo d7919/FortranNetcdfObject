@@ -25,6 +25,5 @@ To build the netcdf object one needs to compile in the following order:
 * Add some error checking.
 * Better error message handling.
 * Preprocessor directives?
-* Convert logical_to_int to an elemental function.
 * The ability to populate a file object from an existing file (i.e. to read in data).
 * Add a simple makefile to produce a library which can be linked.

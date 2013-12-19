@@ -16,11 +16,6 @@ module netcdf_file
   !and associated routines.
   !</DD>
 
-  interface logical_to_int
-     module procedure :: log2int_s,log2int_1,log2int_2,log2int_3
-     module procedure :: log2int_4,log2int_5,log2int_6,log2int_7
-  end interface logical_to_int
-
   type :: ncdf_file_type
      type(ncdf_dim_type), dimension(:), allocatable :: dims !The dimensions
      type(ncdf_var_type), dimension(:), allocatable :: vars !The variables
@@ -1494,7 +1489,7 @@ contains
     endif
 
     !Convert logical to integer
-    call logical_to_int(dat,idat)
+    idat=log2int(dat)
 
     !Put variable
     if(with_start)then
@@ -1538,7 +1533,7 @@ contains
 
 
     !Convert logical to integer
-    call logical_to_int(dat,idat)
+    idat=log2int(dat)
     
     !Put variable
     status=nf90_put_var(self%id,self%vars(v_index)%id,idat,start=starts,count=counts)
@@ -1580,7 +1575,7 @@ contains
     enddo
     
     !Convert logical to integer
-    call logical_to_int(dat,idat)
+    idat=log2int(dat)
 
     !Put variable
     status=nf90_put_var(self%id,self%vars(v_index)%id,idat,start=starts,count=counts)
@@ -1622,7 +1617,7 @@ contains
     enddo
         
     !Convert logical to integer
-    call logical_to_int(dat,idat)
+    idat=log2int(dat)
 
     !Put variable
     status=nf90_put_var(self%id,self%vars(v_index)%id,idat,start=starts,count=counts)
@@ -1665,7 +1660,7 @@ contains
     enddo
         
     !Convert logical to integer
-    call logical_to_int(dat,idat)
+    idat=log2int(dat)
 
     !Put variable
     status=nf90_put_var(self%id,self%vars(v_index)%id,idat,start=starts,count=counts)
@@ -1707,7 +1702,7 @@ contains
     enddo
         
     !Convert logical to integer
-    call logical_to_int(dat,idat)
+    idat=log2int(dat)
 
     !Put variable
     status=nf90_put_var(self%id,self%vars(v_index)%id,idat,start=starts,count=counts)
@@ -1750,7 +1745,7 @@ contains
     enddo
     
     !Convert logical to integer
-    call logical_to_int(dat,idat)
+    idat=log2int(dat)
     
     !Put variable
     status=nf90_put_var(self%id,self%vars(v_index)%id,idat,start=starts,count=counts)
@@ -1793,7 +1788,7 @@ contains
     enddo
         
     !Convert logical to integer
-    call logical_to_int(dat,idat)
+    idat=log2int(dat)
 
     !Put variable
     status=nf90_put_var(self%id,self%vars(v_index)%id,idat,start=starts,count=counts)
@@ -1805,91 +1800,14 @@ contains
   !/////////////////
   !//UTILS
   !/////////////////
-  subroutine log2int_s(dat,idat)
+  elemental function log2int(dat)
     implicit none
     logical, intent(in) :: dat
-    integer, intent(out) :: idat
+    integer :: log2int
     if(dat)then
-       idat=1
+       log2int=1
     else
-       idat=0
+       log2int=0
     endif
-  end subroutine log2int_s
-
-  subroutine log2int_1(dat,idat)
-    implicit none
-    logical, dimension(:), intent(in) :: dat
-    integer, dimension(:), intent(out) :: idat
-    where(dat)
-       idat=1
-    elsewhere
-       idat=0
-    end where
-  end subroutine log2int_1
-
-  subroutine log2int_2(dat,idat)
-    implicit none
-    logical, dimension(:,:), intent(in) :: dat
-    integer, dimension(:,:), intent(out) :: idat
-    where(dat)
-       idat=1
-    elsewhere
-       idat=0
-    end where
-  end subroutine log2int_2
-
-  subroutine log2int_3(dat,idat)
-    implicit none
-    logical, dimension(:,:,:), intent(in) :: dat
-    integer, dimension(:,:,:), intent(out) :: idat
-    where(dat)
-       idat=1
-    elsewhere
-       idat=0
-    end where
-  end subroutine log2int_3
-
-  subroutine log2int_4(dat,idat)
-    implicit none
-    logical, dimension(:,:,:,:), intent(in) :: dat
-    integer, dimension(:,:,:,:), intent(out) :: idat
-    where(dat)
-       idat=1
-    elsewhere
-       idat=0
-    end where
-  end subroutine log2int_4
-
-  subroutine log2int_5(dat,idat)
-    implicit none
-    logical, dimension(:,:,:,:,:), intent(in) :: dat
-    integer, dimension(:,:,:,:,:), intent(out) :: idat
-    where(dat)
-       idat=1
-    elsewhere
-       idat=0
-    end where
-  end subroutine log2int_5
-
-  subroutine log2int_6(dat,idat)
-    implicit none
-    logical, dimension(:,:,:,:,:,:), intent(in) :: dat
-    integer, dimension(:,:,:,:,:,:), intent(out) :: idat
-    where(dat)
-       idat=1
-    elsewhere
-       idat=0
-    end where
-  end subroutine log2int_6
-
-  subroutine log2int_7(dat,idat)
-    implicit none
-    logical, dimension(:,:,:,:,:,:,:), intent(in) :: dat
-    integer, dimension(:,:,:,:,:,:,:), intent(out) :: idat
-    where(dat)
-       idat=1
-    elsewhere
-       idat=0
-    end where
-  end subroutine log2int_7
+  end function log2int
 end module netcdf_file
