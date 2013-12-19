@@ -49,6 +49,7 @@ module netcdf_file
      procedure :: enable_complex !Creates the complex dimension
      procedure,public :: flush_file !Flush the output
      procedure,public :: increment_unlim !Increments the size of the unlimited dimension 
+     procedure,public :: set_unlim !Sets the current index of the unlimited dimension 
   end type ncdf_file_type
 
 contains
@@ -160,6 +161,13 @@ contains
        self%unlim_dim=self%unlim_dim+1
     endif
   end subroutine increment_unlim
+
+  subroutine set_unlim(self,inc)
+    implicit none
+    class(ncdf_file_type), intent(inout) :: self
+    integer, intent(in) :: inc
+    self%unlim_dim=inc
+  end subroutine set_unlim
 
   !Flush the output
   subroutine flush_file(self)
