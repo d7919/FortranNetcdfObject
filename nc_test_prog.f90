@@ -13,11 +13,11 @@ program tester
   call My_Output%set_name(name="test.nc")
 
   !Now define the dimensions
-  call My_Output%create_dim(name='x',size=nx)
-  call My_Output%create_dim(name='y',size=ny)
-  call My_Output%create_dim(name='c',size=200)
-  call My_Output%create_dim(name='j',size=2)
-  call My_Output%create_dim(name='l',size=nl)
+  call My_Output%create_dim(name='x',size=nx) !Note the dimension name can be longer than 1 char
+  call My_Output%create_dim(name='y',size=ny) !but makes it tricky to use array constructors as
+  call My_Output%create_dim(name='c',size=200)!it's not possible to use strings of different length
+  call My_Output%create_dim(name='j  ',size=2)  !i.e. (/'c200','j'/) is not valid, though (/'c200','j   '/)
+  call My_Output%create_dim(name='l',size=nl) !should be and the library should ignore the blanks.
   call My_Output%create_dim(name='t',unlimited=.true.)
 
   !Now define the variables
